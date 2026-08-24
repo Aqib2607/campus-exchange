@@ -30,7 +30,7 @@ export function DashboardShell({
             {links.map((link) => (
               <Link
                 key={link.to}
-                to={link.to}
+                to={link.to as never}
                 activeOptions={{ exact: link.to === "/dashboard" || link.to === "/admin" }}
                 className="flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 activeProps={{ className: "bg-primary/10 text-primary hover:bg-primary/10" }}
