@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { LoadingState, EmptyState, ErrorState } from "@/components/common/states";
@@ -14,8 +14,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { api } from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
-import type { Product } from "@/types";
+import type { Product, Category } from "@/types";
 import { Plus, LayoutGrid } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/products/")({
   component: ProductsPage,
@@ -69,28 +70,21 @@ function applyFilters(products: Product[], search: string, filters: FilterValues
 
 function ProductsPage() {
   const { user } = useAuth();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<FilterValues>(emptyFilters);
   const [sort, setSort] = useState("newest");
 
-  const load = () => {
-    setLoading(true);
-    setError(false);
-    api.products
-      .list()
-      .then(setProducts)
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
-  };
+  const { data: products = [], isLoading, isError, refetch } = useQuery<Product[]>({
+    queryKey: ['products'],
+    queryFn: () => api.products.list(),
+  });
 
-  useEffect(() => {
-    load();
-  }, []);
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ['categories'],
+    queryFn: api.categories.list,
+  });
 
-  const displayed = loading ? [] : applyFilters(products, search, filters, sort);
+  const displayed = isLoading ? [] : applyFilters(products, search, filters, sort);
 
   return (
     <AppLayout>
@@ -143,7 +137,12 @@ function ProductsPage() {
 
           {/* Mobile filters trigger */}
           <div className="mb-8 lg:hidden">
-            <MobileFilters values={filters} onChange={setFilters} onReset={() => setFilters(emptyFilters)} />
+            <MobileFilters
+              values={filters}
+              onChange={setFilters}
+              onReset={() => setFilters(emptyFilters)}
+              categories={categories}
+            />
           </div>
 
           <div className="flex flex-col gap-10 lg:flex-row">
@@ -155,16 +154,17 @@ function ProductsPage() {
                   values={filters}
                   onChange={setFilters}
                   onReset={() => setFilters(emptyFilters)}
+                  categories={categories}
                 />
               </div>
             </aside>
 
             {/* Product grid */}
             <div className="min-w-0 flex-1">
-              {loading ? (
+              {isLoading ? (
                 <LoadingState label="Loading catalog…" rows={6} />
-              ) : error ? (
-                <ErrorState onRetry={load} />
+              ) : isError ? (
+                <ErrorState onRetry={() => refetch()} />
               ) : displayed.length === 0 ? (
                 <EmptyState
                   title="No items found"

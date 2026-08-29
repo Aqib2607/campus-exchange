@@ -1,27 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import { useAuth } from "@/contexts/AuthContext";
-import { mockStatistics, mockProducts, mockCategories, mockReports, getCategoryName } from "@/lib/mock-data";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/services/api";
 import { useEffect } from "react";
-import {
-  LayoutDashboard,
-  Users,
-  Package,
-  Tag,
-  Flag,
-  BarChart2,
-  TrendingUp,
-  ShoppingBag,
-} from "lucide-react";
-
-const adminLinks = [
-  { to: "/admin", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
-  { to: "/admin/users", label: "Users", icon: <Users className="h-4 w-4" /> },
-  { to: "/admin/products", label: "Products", icon: <Package className="h-4 w-4" /> },
-  { to: "/admin/categories", label: "Categories", icon: <Tag className="h-4 w-4" /> },
-  { to: "/admin/reports", label: "Reports", icon: <Flag className="h-4 w-4" /> },
-  { to: "/admin/analytics", label: "Analytics", icon: <BarChart2 className="h-4 w-4" /> },
-];
+import { TrendingUp, ShoppingBag, Users, Package, Flag } from "lucide-react";
+import { adminLinks } from "@/config/nav";
 
 export const Route = createFileRoute("/admin/analytics")({
   component: AdminAnalyticsPage,
@@ -36,32 +20,55 @@ function AdminAnalyticsPage() {
     else if (user.role !== "admin") navigate({ to: "/dashboard" });
   }, [user, navigate]);
 
+  const { data: statsData, isLoading: isStatsLoading } = useQuery({
+    queryKey: ['admin', 'stats'],
+    queryFn: api.admin.statistics,
+    enabled: !!user?.id && user?.role === "admin",
+  });
+
+  const { data: products = [], isLoading: isProductsLoading } = useQuery({
+    queryKey: ['admin', 'products'],
+    queryFn: api.admin.products,
+    enabled: !!user?.id && user?.role === "admin",
+  });
+
+  const { data: categories = [], isLoading: isCategoriesLoading } = useQuery({
+    queryKey: ['categories'],
+    queryFn: api.categories.list,
+  });
+
+  const { data: reports = [], isLoading: isReportsLoading } = useQuery({
+    queryKey: ['admin', 'reports'],
+    queryFn: api.reports.list,
+    enabled: !!user?.id && user?.role === "admin",
+  });
+
   if (!user || user.role !== "admin") return null;
 
-  const s = mockStatistics;
+  const isLoading = isStatsLoading || isProductsLoading || isCategoriesLoading || isReportsLoading;
 
   // Category distribution
-  const categoryDistribution = mockCategories.map((cat) => ({
+  const categoryDistribution = categories.map((cat: any) => ({
     name: cat.name,
-    count: mockProducts.filter((p) => p.category_id === cat.id).length,
-  })).sort((a, b) => b.count - a.count);
+    count: products.filter((p: any) => p.category_id === cat.id).length,
+  })).sort((a: any, b: any) => b.count - a.count);
 
-  const maxCategoryCount = Math.max(...categoryDistribution.map((c) => c.count), 1);
+  const maxCategoryCount = Math.max(...categoryDistribution.map((c: any) => c.count), 1);
 
   // Product status distribution
-  const availableCount = mockProducts.filter((p) => p.status === "available").length;
-  const soldCount = mockProducts.filter((p) => p.status === "sold").length;
-  const total = mockProducts.length || 1;
+  const availableCount = products.filter((p: any) => p.status === "available").length;
+  const soldCount = products.filter((p: any) => p.status === "sold").length;
+  const total = products.length || 1;
 
   // Report distribution
-  const pendingReports = mockReports.filter((r) => r.status === "pending").length;
-  const resolvedReports = mockReports.filter((r) => r.status === "resolved").length;
+  const pendingReports = reports.filter((r: any) => r.status === "pending").length;
+  const resolvedReports = reports.filter((r: any) => r.status === "resolved").length;
 
   return (
     <DashboardShell links={adminLinks} heading="Admin Panel">
       <div className="space-y-8">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Analytics</h1>
+          <h1 className="font-display text-4xl font-bold uppercase tracking-widest text-foreground">Analytics</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Basic platform statistics and activity overview.
           </p>
@@ -70,25 +77,25 @@ function AdminAnalyticsPage() {
         {/* Summary stat cards */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {[
-            { label: "Users", value: s.total_users, icon: <Users className="h-4 w-4" /> },
-            { label: "Products", value: s.total_products, icon: <Package className="h-4 w-4" /> },
-            { label: "Requests", value: s.total_requests, icon: <ShoppingBag className="h-4 w-4" /> },
-            { label: "Reports", value: s.total_reports, icon: <Flag className="h-4 w-4" /> },
+            { label: "Users", value: statsData?.total_users || 0, icon: <Users className="h-4 w-4" /> },
+            { label: "Products", value: statsData?.total_products || 0, icon: <Package className="h-4 w-4" /> },
+            { label: "Requests", value: statsData?.total_requests || 0, icon: <ShoppingBag className="h-4 w-4" /> },
+            { label: "Reports", value: statsData?.total_reports || 0, icon: <Flag className="h-4 w-4" /> },
           ].map((item) => (
-            <div key={item.label} className="rounded-xl border border-border bg-card p-4">
+            <div key={item.label} className="rounded-none border-2 border-border bg-card p-4">
               <div className="flex items-center gap-2 text-muted-foreground">
                 {item.icon}
                 <span className="text-sm">{item.label}</span>
               </div>
-              <p className="mt-2 text-3xl font-bold text-foreground">{item.value}</p>
+              <p className="mt-2 text-3xl font-bold text-foreground">{isLoading ? "..." : item.value}</p>
             </div>
           ))}
         </div>
 
         {/* Product status breakdown */}
         <section>
-          <h2 className="mb-4 text-base font-semibold text-foreground">Product Status</h2>
-          <div className="overflow-hidden rounded-xl border border-border bg-card p-6">
+          <h2 className="mb-4 font-display text-2xl font-bold uppercase tracking-tight text-foreground">Product Status</h2>
+          <div className="overflow-hidden rounded-none border-2 border-border bg-card p-6">
             <div className="grid grid-cols-2 gap-6 md:grid-cols-3">
               <div className="text-center">
                 <p className="text-4xl font-bold text-success">{availableCount}</p>
@@ -126,9 +133,9 @@ function AdminAnalyticsPage() {
 
         {/* Category distribution */}
         <section>
-          <h2 className="mb-4 text-base font-semibold text-foreground">Products by Category</h2>
-          <div className="overflow-hidden rounded-xl border border-border bg-card p-6 space-y-4">
-            {categoryDistribution.map((cat) => (
+          <h2 className="mb-4 font-display text-2xl font-bold uppercase tracking-tight text-foreground">Products by Category</h2>
+          <div className="overflow-hidden rounded-none border-2 border-border bg-card p-6 space-y-4">
+            {categoryDistribution.map((cat: any) => (
               <div key={cat.name}>
                 <div className="flex justify-between text-sm mb-1">
                   <span className="font-medium text-foreground">{cat.name}</span>
@@ -151,13 +158,13 @@ function AdminAnalyticsPage() {
 
         {/* Reports breakdown */}
         <section>
-          <h2 className="mb-4 text-base font-semibold text-foreground">Report Status</h2>
+          <h2 className="mb-4 font-display text-2xl font-bold uppercase tracking-tight text-foreground">Report Status</h2>
           <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-xl border border-border bg-card p-4 text-center">
+            <div className="rounded-none border-2 border-border bg-card p-4 text-center">
               <p className="text-3xl font-bold text-warning-foreground">{pendingReports}</p>
               <p className="mt-1 text-sm text-muted-foreground">Pending</p>
             </div>
-            <div className="rounded-xl border border-border bg-card p-4 text-center">
+            <div className="rounded-none border-2 border-border bg-card p-4 text-center">
               <p className="text-3xl font-bold text-success">{resolvedReports}</p>
               <p className="mt-1 text-sm text-muted-foreground">Resolved</p>
             </div>

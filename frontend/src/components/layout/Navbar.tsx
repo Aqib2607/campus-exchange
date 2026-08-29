@@ -25,10 +25,10 @@ export function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const handleSignOut = () => {
-    signOut();
+  const handleSignOut = async () => {
     setOpen(false);
-    navigate({ to: "/login" });
+    await signOut();
+    navigate({ to: "/" });
   };
 
   const navItems = (

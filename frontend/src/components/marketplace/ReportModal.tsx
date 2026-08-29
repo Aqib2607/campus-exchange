@@ -20,6 +20,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, CheckCircle } from "lucide-react";
 import type { ReportReason, ReportTargetType } from "@/types";
+import { api } from "@/services/api";
 
 const REASONS: ReportReason[] = [
   "Spam",
@@ -33,10 +34,11 @@ interface ReportModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   targetType: ReportTargetType;
+  targetId: number;
   targetLabel: string;
 }
 
-export function ReportModal({ open, onOpenChange, targetType, targetLabel }: ReportModalProps) {
+export function ReportModal({ open, onOpenChange, targetType, targetId, targetLabel }: ReportModalProps) {
   const [reason, setReason] = useState<string>("");
   const [description, setDescription] = useState("");
   const [errors, setErrors] = useState<{ reason?: string; description?: string }>({});
@@ -66,8 +68,17 @@ export function ReportModal({ open, onOpenChange, targetType, targetLabel }: Rep
     e.preventDefault();
     if (!validate()) return;
     setStatus("loading");
-    await new Promise((r) => setTimeout(r, 700));
-    setStatus("success");
+    try {
+      await api.reports.create({
+        target_type: targetType,
+        target_id: targetId,
+        reason,
+        description,
+      });
+      setStatus("success");
+    } catch {
+      setStatus("error");
+    }
   };
 
   return (

@@ -6,7 +6,7 @@ import { Footer } from "./Footer";
 export interface SidebarLink {
   to: string;
   label: string;
-  icon: ReactNode;
+  icon: () => ReactNode;
 }
 
 export function DashboardShell({
@@ -35,7 +35,7 @@ export function DashboardShell({
                 className="flex shrink-0 items-center gap-3 rounded-none px-4 py-3 text-xs font-bold uppercase tracking-widest text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
                 activeProps={{ className: "bg-foreground text-background hover:bg-foreground hover:text-background" }}
               >
-                <span aria-hidden="true">{link.icon}</span>
+                <span aria-hidden="true">{link.icon()}</span>
                 {link.label}
               </Link>
             ))}

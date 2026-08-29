@@ -13,8 +13,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { conditions, locations } from "./Filters";
-import { mockCategories } from "@/lib/mock-data";
-import type { Product } from "@/types";
+import type { Product, Category } from "@/types";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/services/api";
+import { Loader2 } from "lucide-react";
 
 export interface ProductFormValues {
   name: string;
@@ -22,7 +24,7 @@ export interface ProductFormValues {
   price: string;
   category: string;
   condition: string;
-  image: string;
+  imageFile: File | null;
   location: string;
   contact: string;
 }
@@ -31,18 +33,25 @@ type Errors = Partial<Record<keyof ProductFormValues, string>>;
 
 export function ProductForm({ product, mode }: { product?: Product; mode: "create" | "edit" }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [values, setValues] = useState<ProductFormValues>({
     name: product?.name ?? "",
     description: product?.description ?? "",
     price: product ? String(product.price) : "",
     category: product ? String(product.category_id) : "",
     condition: product?.condition ?? "",
-    image: product?.image ?? "",
+    imageFile: null,
     location: product?.location ?? "",
     contact: product?.contact_information ?? "",
   });
   const [errors, setErrors] = useState<Errors>({});
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [serverError, setServerError] = useState<string>("");
+
+  const { data: categories = [], isLoading: categoriesLoading } = useQuery<Category[]>({
+    queryKey: ['categories'],
+    queryFn: api.categories.list,
+  });
 
   const set = (patch: Partial<ProductFormValues>) => setValues((v) => ({ ...v, ...patch }));
 
@@ -50,25 +59,58 @@ export function ProductForm({ product, mode }: { product?: Product; mode: "creat
     const e: Errors = {};
     if (!values.name.trim()) e.name = "Product name is required.";
     if (values.description.trim().length < 10) e.description = "Add at least 10 characters of description.";
-    if (!values.price || Number(values.price) <= 0) e.price = "Enter a price greater than 0.";
-    if (!values.category) e.category = "Select a category.";
-    if (!values.condition) e.condition = "Select a condition.";
-    if (!values.location) e.location = "Select a campus location.";
-    if (!values.contact.trim()) e.contact = "Contact information is required.";
-    setErrors(e);
-    return Object.keys(e).length === 0;
+    if (!values.price || isNaN(Number(values.price)) || Number(values.price) < 0) {
+      e.price = "Enter a valid positive price.";
+    }
+    if (!values.category) e.category = "Please choose a category.";
+    if (!values.condition) e.condition = "Please choose a condition.";
+    if (!values.location) e.location = "Please choose a campus location.";
+    if (!values.contact.trim()) e.contact = "Provide a phone number or email.";
+    return e;
   };
 
-  const onSubmit = (event: FormEvent) => {
-    event.preventDefault();
-    setStatus("idle");
-    if (!validate()) {
-      setStatus("error");
-      return;
-    }
+  const onSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const errs = validate();
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
     setStatus("submitting");
-    // Frontend phase: no API call. POST/PUT /products goes here later.
-    window.setTimeout(() => setStatus("success"), 700);
+
+    try {
+      const formData = new FormData();
+      formData.append("name", values.name.trim());
+      formData.append("description", values.description.trim());
+      formData.append("price", values.price);
+      formData.append("category_id", values.category);
+      formData.append("condition", values.condition);
+      formData.append("location", values.location);
+      formData.append("contact_information", values.contact.trim());
+      if (values.imageFile) {
+        formData.append("image", values.imageFile);
+      }
+
+      if (mode === "create") {
+        await api.products.create(formData);
+        queryClient.invalidateQueries({ queryKey: ['myListings'] });
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+        navigate({ to: "/dashboard/listings" });
+      } else if (product) {
+        await api.products.update(product.id, formData);
+        queryClient.invalidateQueries({ queryKey: ['myListings'] });
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+        setStatus("success");
+        navigate({ to: "/dashboard/listings" });
+      }
+    } catch (err: any) {
+      setStatus("error");
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.errors
+          ? Object.values(err.response.data.errors).flat().join(" ")
+          : "Something went wrong. Please try again.";
+      setServerError(msg as string);
+    }
   };
 
   const err = (key: keyof ProductFormValues) =>
@@ -79,19 +121,19 @@ export function ProductForm({ product, mode }: { product?: Product; mode: "creat
     ) : null;
 
   return (
-    <form onSubmit={onSubmit} noValidate className="space-y-6">
+    <form onSubmit={onSubmit} noValidate className="space-y-6" encType="multipart/form-data">
       {status === "success" && (
         <Alert className="border-success/40 bg-success/10">
-          <AlertTitle>{mode === "create" ? "Listing created" : "Changes saved"}</AlertTitle>
+          <AlertTitle>{mode === "create" ? "Listing created!" : "Changes saved!"}</AlertTitle>
           <AlertDescription>
-            This is a frontend demonstration — nothing has been sent to a server yet.
+            Your listing has been {mode === "create" ? "published" : "updated"} on the marketplace.
           </AlertDescription>
         </Alert>
       )}
       {status === "error" && (
         <Alert variant="destructive">
           <AlertTitle>Please fix the highlighted fields</AlertTitle>
-          <AlertDescription>Some required information is missing or invalid.</AlertDescription>
+          <AlertDescription>{serverError || "Some required information is missing or invalid."}</AlertDescription>
         </Alert>
       )}
 
@@ -139,14 +181,20 @@ export function ProductForm({ product, mode }: { product?: Product; mode: "creat
           <Label htmlFor="category">Category</Label>
           <Select value={values.category} onValueChange={(v) => set({ category: v })}>
             <SelectTrigger id="category" aria-invalid={!!errors.category}>
-              <SelectValue placeholder="Select category" />
+              <SelectValue placeholder={categoriesLoading ? "Loading…" : "Select category"} />
             </SelectTrigger>
             <SelectContent>
-              {mockCategories.map((c) => (
-                <SelectItem key={c.id} value={String(c.id)}>
-                  {c.name}
-                </SelectItem>
-              ))}
+              {categoriesLoading ? (
+                <div className="flex items-center justify-center p-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
+              ) : (
+                categories.map((c: Category) => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.name}
+                  </SelectItem>
+                ))
+              )}
             </SelectContent>
           </Select>
           {err("category")}
@@ -187,16 +235,18 @@ export function ProductForm({ product, mode }: { product?: Product; mode: "creat
         </div>
 
         <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor="image">Product image URL</Label>
+          <Label htmlFor="image">Product image</Label>
           <Input
             id="image"
-            value={values.image}
-            onChange={(e) => set({ image: e.target.value })}
-            placeholder="https://…"
+            type="file"
+            accept="image/*"
+            onChange={(e) => set({ imageFile: e.target.files?.[0] ?? null })}
           />
-          <p className="text-xs text-muted-foreground">
-            File upload will be handled by the API later; a URL is used for this phase.
-          </p>
+          {product?.image && product.image !== "placeholder.png" && (
+            <p className="text-xs text-muted-foreground">
+              Current image: <span className="font-medium">{product.image.split("/").pop()}</span>. Upload a new one to replace it.
+            </p>
+          )}
         </div>
 
         <div className="space-y-2 sm:col-span-2">
@@ -215,6 +265,7 @@ export function ProductForm({ product, mode }: { product?: Product; mode: "creat
 
       <div className="flex flex-col gap-2 sm:flex-row">
         <Button type="submit" disabled={status === "submitting"}>
+          {status === "submitting" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {status === "submitting"
             ? "Saving…"
             : mode === "create"

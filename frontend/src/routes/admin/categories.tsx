@@ -24,30 +24,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { mockCategories, formatDate } from "@/lib/mock-data";
+import { formatDate } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import {
-  LayoutDashboard,
-  Users,
-  Package,
-  Tag,
-  Flag,
-  BarChart2,
-  Plus,
-  Edit,
-  Trash2,
-  Loader2,
-} from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/services/api";
+import { Tag, Plus, Edit, Trash2, Loader2 } from "lucide-react";
 import type { Category } from "@/types";
-
-const adminLinks = [
-  { to: "/admin", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
-  { to: "/admin/users", label: "Users", icon: <Users className="h-4 w-4" /> },
-  { to: "/admin/products", label: "Products", icon: <Package className="h-4 w-4" /> },
-  { to: "/admin/categories", label: "Categories", icon: <Tag className="h-4 w-4" /> },
-  { to: "/admin/reports", label: "Reports", icon: <Flag className="h-4 w-4" /> },
-  { to: "/admin/analytics", label: "Analytics", icon: <BarChart2 className="h-4 w-4" /> },
-];
+import { adminLinks } from "@/config/nav";
 
 export const Route = createFileRoute("/admin/categories")({
   component: AdminCategoriesPage,
@@ -56,13 +39,39 @@ export const Route = createFileRoute("/admin/categories")({
 function AdminCategoriesPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [categories, setCategories] = useState<Category[]>(mockCategories);
+  const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [nameInput, setNameInput] = useState("");
   const [nameError, setNameError] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [nextId, setNextId] = useState(100);
+
+  const { data: categories = [], isLoading } = useQuery({
+    queryKey: ['categories'],
+    queryFn: api.categories.list,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: api.categories.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      setDialogOpen(false);
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => api.categories.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      setDialogOpen(false);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: api.categories.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+    },
+  });
 
   useEffect(() => {
     if (!user) navigate({ to: "/login" });
@@ -91,23 +100,16 @@ function AdminCategoriesPage() {
       setNameError("Category name is required.");
       return;
     }
-    setSaving(true);
-    await new Promise((r) => setTimeout(r, 500));
+    
     if (editing) {
-      setCategories((prev) => prev.map((c) => (c.id === editing.id ? { ...c, name: nameInput.trim() } : c)));
+      updateMutation.mutate({ id: editing.id, data: { name: nameInput.trim() } });
     } else {
-      setCategories((prev) => [
-        ...prev,
-        { id: nextId, name: nameInput.trim(), created_at: new Date().toISOString() },
-      ]);
-      setNextId((n) => n + 1);
+      createMutation.mutate({ name: nameInput.trim() });
     }
-    setSaving(false);
-    setDialogOpen(false);
   };
 
   const handleDelete = (id: number) => {
-    setCategories((prev) => prev.filter((c) => c.id !== id));
+    deleteMutation.mutate(id);
   };
 
   return (
@@ -115,7 +117,7 @@ function AdminCategoriesPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-foreground">Categories</h1>
+            <h1 className="font-display text-4xl font-bold uppercase tracking-widest text-foreground">Categories</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Manage the product categories available to students.
             </p>
@@ -126,7 +128,9 @@ function AdminCategoriesPage() {
           </Button>
         </div>
 
-        {categories.length === 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+        ) : categories.length === 0 ? (
           <EmptyState
             title="No categories"
             description="Create categories so students can classify their listings."
@@ -134,9 +138,9 @@ function AdminCategoriesPage() {
             action={<Button onClick={openCreate}>Add category</Button>}
           />
         ) : (
-          <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="overflow-hidden rounded-none border-2 border-border bg-card">
             <div className="divide-y divide-border">
-              {categories.map((cat) => (
+              {categories.map((cat: any) => (
                 <div key={cat.id} className="flex items-center justify-between px-4 py-3">
                   <div>
                     <p className="font-medium text-foreground">{cat.name}</p>
@@ -204,18 +208,18 @@ function AdminCategoriesPage() {
                 placeholder="e.g. Books"
                 aria-invalid={!!nameError}
                 aria-describedby={nameError ? "cat-name-error" : undefined}
-                disabled={saving}
+                disabled={createMutation.isPending || updateMutation.isPending}
               />
               {nameError && (
                 <p id="cat-name-error" className="text-xs text-destructive">{nameError}</p>
               )}
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>
+              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={createMutation.isPending || updateMutation.isPending}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={saving}>
-                {saving ? (
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+                {createMutation.isPending || updateMutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
                     Saving…

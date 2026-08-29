@@ -4,16 +4,18 @@ import { PageHeader, EmptyState } from "@/components/common/states";
 import { ProductGrid } from "@/components/marketplace/ProductCard";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { mockProducts } from "@/lib/mock-data";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/services/api";
 import { useEffect } from "react";
-import { Heart } from "lucide-react";
+import { Heart, Loader2 } from "lucide-react";
+import type { Product } from "@/types";
 
 export const Route = createFileRoute("/favorites")({
   component: FavoritesPage,
 });
 
 function FavoritesPage() {
-  const { user, favorites } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -22,9 +24,15 @@ function FavoritesPage() {
     }
   }, [user, navigate]);
 
+  const { data: favoritesData, isLoading } = useQuery({
+    queryKey: ['favorites', user?.id],
+    queryFn: api.favorites.list,
+    enabled: !!user?.id,
+  });
+
   if (!user) return null;
 
-  const savedProducts = mockProducts.filter((p) => favorites.includes(p.id));
+  const savedProducts: Product[] = favoritesData?.map((f: any) => f.product).filter(Boolean) || [];
 
   return (
     <AppLayout>
@@ -33,7 +41,11 @@ function FavoritesPage() {
         description="Products you have saved for later"
       />
 
-      {savedProducts.length === 0 ? (
+      {isLoading ? (
+        <div className="flex h-64 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : savedProducts.length === 0 ? (
         <EmptyState
           title="No saved products yet"
           description="Browse the marketplace and save products you are interested in."
@@ -55,3 +67,4 @@ function FavoritesPage() {
     </AppLayout>
   );
 }
+

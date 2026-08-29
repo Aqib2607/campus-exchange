@@ -6,12 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, CheckCircle } from "lucide-react";
+import { api } from "@/services/api";
+import { useSearch } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/reset-password")({
   component: ResetPasswordPage,
 });
 
 function ResetPasswordPage() {
+  const search = useSearch({ from: '/reset-password' }) as { token?: string; email?: string };
   const [form, setForm] = useState({ password: "", confirm: "" });
   const [errors, setErrors] = useState<{ password?: string; confirm?: string }>({});
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -30,8 +33,17 @@ function ResetPasswordPage() {
     e.preventDefault();
     if (!validate()) return;
     setStatus("loading");
-    await new Promise((r) => setTimeout(r, 800));
-    setStatus("success");
+    try {
+      await api.auth.resetPassword({
+        token: search.token,
+        email: search.email,
+        password: form.password,
+        password_confirmation: form.confirm,
+      });
+      setStatus("success");
+    } catch {
+      setStatus("error");
+    }
   };
 
   if (status === "success") {

@@ -10,9 +10,25 @@ class CategoryController extends Controller
 {
     public function index()
     {
+        $categories = Category::all();
+        if ($categories->isEmpty()) {
+            $defaults = [
+                'Books',
+                'Electronics',
+                'Furniture',
+                'Clothing',
+                'Accessories',
+                'Academic Materials',
+            ];
+            foreach ($defaults as $name) {
+                Category::firstOrCreate(['name' => $name]);
+            }
+            $categories = Category::all();
+        }
+
         return response()->json([
             'success' => true,
-            'data' => CategoryResource::collection(Category::all())
+            'data' => CategoryResource::collection($categories)
         ]);
     }
 

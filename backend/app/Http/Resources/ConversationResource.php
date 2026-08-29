@@ -14,6 +14,9 @@ class ConversationResource extends JsonResource
             'product_id' => $this->product_id,
             'participant_ids' => [$this->user_one_id, $this->user_two_id],
             'last_message_at' => $this->updated_at->toIso8601String(),
+            'product' => new ProductResource($this->whenLoaded('product')),
+            'userOne' => new UserResource($this->whenLoaded('userOne')),
+            'userTwo' => new UserResource($this->whenLoaded('userTwo')),
         ];
     }
 }

@@ -36,13 +36,33 @@ export const api = {
     login: (data: any) => apiClient.post('/auth/login', data).then(res => res.data),
     logout: () => apiClient.post('/auth/logout').then(res => res.data),
     me: () => apiClient.get('/auth/user').then(extractData),
+    updateProfile: (data: any) => apiClient.put('/auth/user', data).then(res => res.data),
+    resendVerification: () => apiClient.post('/email/verification-notification').then(res => res.data),
+    forgotPassword: (data: any) => apiClient.post('/auth/forgot-password', data).then(res => res.data),
+    resetPassword: (data: any) => apiClient.post('/auth/reset-password', data).then(res => res.data),
   },
   products: {
     list: (params?: any) => apiClient.get<any>('/products', { params }).then(extractData),
+    mine: () => apiClient.get<any>('/products/mine').then(extractData),
     get: (id: number) => apiClient.get<any>(`/products/${id}`).then(extractData),
     byUser: (userId: number) => apiClient.get<any>('/products', { params: { user_id: userId } }).then(extractData),
-    create: (data: any) => apiClient.post('/products', data).then(extractData),
-    update: (id: number, data: any) => apiClient.patch(`/products/${id}`, data).then(extractData),
+    create: (data: FormData | any) => {
+      const isFormData = data instanceof FormData;
+      return apiClient.post('/products', data, 
+        isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}
+      ).then(extractData);
+    },
+    update: (id: number, data: FormData | any) => {
+      const isFormData = data instanceof FormData;
+      // Laravel doesn't support file upload via PATCH, so we use POST with _method spoofing
+      if (isFormData) {
+        data.append('_method', 'PATCH');
+        return apiClient.post(`/products/${id}`, data, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        }).then(extractData);
+      }
+      return apiClient.patch(`/products/${id}`, data).then(extractData);
+    },
     delete: (id: number) => apiClient.delete(`/products/${id}`).then(res => res.data),
   },
   categories: {

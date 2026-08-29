@@ -17,29 +17,19 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ReportModal } from "@/components/marketplace/ReportModal";
 import { useAuth } from "@/contexts/AuthContext";
-import { mockUsers, formatDate } from "@/lib/mock-data";
+import { formatDate } from "@/lib/utils";
 import { useEffect, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/services/api";
 import {
-  LayoutDashboard,
   Users,
-  Package,
-  Tag,
-  Flag,
-  BarChart2,
   Search,
   ShieldOff,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import type { User } from "@/types";
-
-const adminLinks = [
-  { to: "/admin", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
-  { to: "/admin/users", label: "Users", icon: <Users className="h-4 w-4" /> },
-  { to: "/admin/products", label: "Products", icon: <Package className="h-4 w-4" /> },
-  { to: "/admin/categories", label: "Categories", icon: <Tag className="h-4 w-4" /> },
-  { to: "/admin/reports", label: "Reports", icon: <Flag className="h-4 w-4" /> },
-  { to: "/admin/analytics", label: "Analytics", icon: <BarChart2 className="h-4 w-4" /> },
-];
+import { adminLinks } from "@/config/nav";
 
 export const Route = createFileRoute("/admin/users")({
   component: AdminUsersPage,
@@ -52,9 +42,8 @@ function toneForUserStatus(status: string) {
 function AdminUsersPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [statuses, setStatuses] = useState<Record<number, User["status"]>>({});
-  const [deletedIds, setDeletedIds] = useState<number[]>([]);
   const [reportTarget, setReportTarget] = useState<User | null>(null);
 
   useEffect(() => {
@@ -62,25 +51,40 @@ function AdminUsersPage() {
     else if (user.role !== "admin") navigate({ to: "/dashboard" });
   }, [user, navigate]);
 
+  const { data: users = [], isLoading } = useQuery({
+    queryKey: ['admin', 'users'],
+    queryFn: api.users.list,
+    enabled: !!user?.id && user?.role === "admin",
+  });
+
+  const blockMutation = useMutation({
+    mutationFn: api.users.block,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: api.users.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+    },
+  });
+
   if (!user || user.role !== "admin") return null;
 
-  const getStatus = (u: User): User["status"] => statuses[u.id] ?? u.status;
-
   const handleBlock = (u: User) => {
-    setStatuses((prev) => ({
-      ...prev,
-      [u.id]: getStatus(u) === "active" ? "blocked" : "active",
-    }));
+    blockMutation.mutate(u.id);
   };
 
   const handleDelete = (id: number) => {
-    setDeletedIds((prev) => [...prev, id]);
+    deleteMutation.mutate(id);
   };
 
-  const visibleUsers = mockUsers
-    .filter((u) => u.role !== "admin" && !deletedIds.includes(u.id))
+  const visibleUsers = users
+    .filter((u: any) => u.role !== "admin")
     .filter(
-      (u) =>
+      (u: any) =>
         !search.trim() ||
         u.name.toLowerCase().includes(search.toLowerCase()) ||
         u.email.toLowerCase().includes(search.toLowerCase()),
@@ -90,7 +94,7 @@ function AdminUsersPage() {
     <DashboardShell links={adminLinks} heading="Admin Panel">
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Users</h1>
+          <h1 className="font-display text-4xl font-bold uppercase tracking-widest text-foreground">Users</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Manage registered student accounts.
           </p>
@@ -109,7 +113,9 @@ function AdminUsersPage() {
           />
         </div>
 
-        {visibleUsers.length === 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+        ) : visibleUsers.length === 0 ? (
           <EmptyState
             title="No users found"
             description={search ? "No users match your search." : "No students registered yet."}
@@ -118,9 +124,9 @@ function AdminUsersPage() {
         ) : (
           <>
             {/* Desktop table */}
-            <div className="hidden overflow-hidden rounded-xl border border-border bg-card md:block">
+            <div className="hidden overflow-hidden rounded-none border-2 border-border bg-card md:block">
               <table className="w-full text-sm">
-                <thead className="border-b border-border bg-muted/40">
+                <thead className="border-b-2 border-border bg-muted/40 uppercase tracking-wider text-xs">
                   <tr>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Email</th>
@@ -131,8 +137,8 @@ function AdminUsersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {visibleUsers.map((u) => {
-                    const status = getStatus(u);
+                  {visibleUsers.map((u: any) => {
+                    const status = u.status;
                     return (
                       <tr key={u.id} className="hover:bg-muted/20">
                         <td className="px-4 py-3 font-medium text-foreground">{u.name}</td>
@@ -188,10 +194,10 @@ function AdminUsersPage() {
 
             {/* Mobile cards */}
             <div className="space-y-3 md:hidden">
-              {visibleUsers.map((u) => {
-                const status = getStatus(u);
+              {visibleUsers.map((u: any) => {
+                const status = u.status;
                 return (
-                  <div key={u.id} className="overflow-hidden rounded-xl border border-border bg-card p-4">
+                  <div key={u.id} className="overflow-hidden rounded-none border-2 border-border bg-card p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="font-medium text-foreground">{u.name}</p>
@@ -240,6 +246,7 @@ function AdminUsersPage() {
           open={!!reportTarget}
           onOpenChange={(o) => !o && setReportTarget(null)}
           targetType="user"
+          targetId={reportTarget.id}
           targetLabel={reportTarget.name}
         />
       )}

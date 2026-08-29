@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Heart, MapPin, MoveRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, toneForProductStatus } from "@/components/common/StatusBadge";
-import { formatPrice, getCategoryName } from "@/lib/mock-data";
+import { formatPrice } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/types";
@@ -61,7 +61,7 @@ export function ProductCard({ product, featured = false }: { product: Product, f
         <div className="flex items-start justify-between gap-4">
           <div className="flex flex-col">
             <span className="mb-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-              {getCategoryName(product.category_id)} · {product.condition}
+              {product.category_name ?? ""}  · {product.condition}
             </span>
             <h3 className={cn(
               "font-display font-bold uppercase tracking-tight text-foreground line-clamp-1",

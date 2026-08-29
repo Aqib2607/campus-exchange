@@ -13,6 +13,7 @@ class ProductResource extends JsonResource
             'id' => $this->id,
             'user_id' => $this->user_id,
             'category_id' => $this->category_id,
+            'category_name' => $this->category?->name,
             'name' => $this->name,
             'description' => $this->description,
             'price' => $this->price,
@@ -22,6 +23,7 @@ class ProductResource extends JsonResource
             'image' => $this->image,
             'status' => $this->status,
             'created_at' => $this->created_at->toIso8601String(),
+            'user' => new UserResource($this->whenLoaded('user')),
         ];
     }
 }

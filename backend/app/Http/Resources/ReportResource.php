@@ -18,6 +18,9 @@ class ReportResource extends JsonResource
             'description' => $this->description,
             'status' => $this->status,
             'created_at' => $this->created_at->toIso8601String(),
+            'reporter' => new UserResource($this->whenLoaded('reporter')),
+            'reportedUser' => new UserResource($this->whenLoaded('reportedUser')),
+            'product' => new ProductResource($this->whenLoaded('product')),
         ];
     }
 }

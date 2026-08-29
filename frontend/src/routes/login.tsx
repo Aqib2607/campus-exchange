@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/contexts/AuthContext";
-import { UNIVERSITY_DOMAIN } from "@/lib/mock-data";
+import { UNIVERSITY_DOMAIN } from "@/lib/constants";
 import { Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
@@ -138,13 +138,6 @@ function LoginPage() {
             Register
           </Link>
         </p>
-
-        <div className="rounded-lg border border-border bg-muted/50 p-3 text-xs text-muted-foreground">
-          <p className="font-medium text-foreground">Demo credentials</p>
-          <p className="mt-1">Student: <span className="font-mono">aqib.rahman@{UNIVERSITY_DOMAIN}</span></p>
-          <p>Admin: <span className="font-mono">admin@{UNIVERSITY_DOMAIN}</span></p>
-          <p className="mt-1 opacity-75">Any password accepted in demo mode.</p>
-        </div>
       </form>
     </AuthLayout>
   );

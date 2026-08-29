@@ -5,33 +5,13 @@ import { StatusBadge, toneForRequestStatus } from "@/components/common/StatusBad
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  mockProducts,
-  mockRequests,
-  formatDate,
-  getUser,
-} from "@/lib/mock-data";
-import { useEffect, useState } from "react";
-import {
-  LayoutDashboard,
-  Package,
-  ShoppingBag,
-  Heart,
-  MessageSquare,
-  User,
-  Check,
-  X,
-} from "lucide-react";
+import { formatDate } from "@/lib/utils";
+import { useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/services/api";
+import { ShoppingBag, Check, X, Loader2 } from "lucide-react";
 import type { PurchaseRequest } from "@/types";
-
-const studentLinks = [
-  { to: "/dashboard", label: "Overview", icon: <LayoutDashboard className="h-4 w-4" /> },
-  { to: "/dashboard/listings", label: "My Listings", icon: <Package className="h-4 w-4" /> },
-  { to: "/dashboard/requests", label: "Requests", icon: <ShoppingBag className="h-4 w-4" /> },
-  { to: "/dashboard/favorites", label: "Favorites", icon: <Heart className="h-4 w-4" /> },
-  { to: "/dashboard/messages", label: "Messages", icon: <MessageSquare className="h-4 w-4" /> },
-  { to: "/dashboard/profile", label: "Profile", icon: <User className="h-4 w-4" /> },
-];
+import { studentLinks } from "@/config/nav";
 
 export const Route = createFileRoute("/dashboard/requests")({
   component: DashboardRequestsPage,
@@ -40,32 +20,55 @@ export const Route = createFileRoute("/dashboard/requests")({
 function DashboardRequestsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  // Local state to simulate accept/reject mutations
-  const [statuses, setStatuses] = useState<Record<number, string>>({});
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!user) navigate({ to: "/login" });
     else if (user.role === "admin") navigate({ to: "/admin" });
   }, [user, navigate]);
 
+  const { data: sentRequests = [], isLoading: isLoadingSent } = useQuery({
+    queryKey: ['requests', 'sent', user?.id],
+    queryFn: api.requests.sent,
+    enabled: !!user?.id && user?.role !== "admin",
+  });
+
+  const { data: receivedRequests = [], isLoading: isLoadingReceived } = useQuery({
+    queryKey: ['requests', 'received', user?.id],
+    queryFn: api.requests.received,
+    enabled: !!user?.id && user?.role !== "admin",
+  });
+
+  const acceptMutation = useMutation({
+    mutationFn: api.requests.accept,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['requests', 'received', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['myListings', user?.id] });
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: api.requests.reject,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['requests', 'received', user?.id] });
+    },
+  });
+
   if (!user || user.role === "admin") return null;
 
-  const sentRequests = mockRequests.filter((r) => r.buyer_id === user.id);
-  const receivedRequests = mockRequests.filter((r) => r.seller_id === user.id);
-
-  const getStatus = (r: PurchaseRequest) => statuses[r.id] ?? r.status;
+  const getStatus = (r: PurchaseRequest) => r.status;
 
   const handleAccept = (r: PurchaseRequest) => {
-    setStatuses((prev) => ({ ...prev, [r.id]: "accepted" }));
+    acceptMutation.mutate(r.id);
   };
   const handleReject = (r: PurchaseRequest) => {
-    setStatuses((prev) => ({ ...prev, [r.id]: "rejected" }));
+    rejectMutation.mutate(r.id);
   };
 
-  const RequestRow = ({ r, showActions }: { r: PurchaseRequest; showActions: boolean }) => {
-    const prod = mockProducts.find((p) => p.id === r.product_id);
-    const buyer = getUser(r.buyer_id);
-    const seller = getUser(r.seller_id);
+  const RequestRow = ({ r, showActions }: { r: any; showActions: boolean }) => {
+    const prod = r.product;
+    const buyer = r.buyer;
+    const seller = r.seller;
     const status = getStatus(r);
     return (
       <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -122,7 +125,7 @@ function DashboardRequestsPage() {
     <DashboardShell links={studentLinks} heading="Student Dashboard">
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Requests</h1>
+          <h1 className="font-display text-4xl font-bold uppercase tracking-widest text-foreground">Requests</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Manage purchase requests you have sent and received.
           </p>
@@ -132,9 +135,9 @@ function DashboardRequestsPage() {
           <TabsList>
             <TabsTrigger value="received">
               Received
-              {receivedRequests.filter((r) => getStatus(r) === "pending").length > 0 && (
+              {receivedRequests.filter((r: any) => getStatus(r) === "pending").length > 0 && (
                 <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                  {receivedRequests.filter((r) => getStatus(r) === "pending").length}
+                  {receivedRequests.filter((r: any) => getStatus(r) === "pending").length}
                 </span>
               )}
             </TabsTrigger>
@@ -142,16 +145,20 @@ function DashboardRequestsPage() {
           </TabsList>
 
           <TabsContent value="received" className="mt-4">
-            {receivedRequests.length === 0 ? (
+            {isLoadingReceived ? (
+              <div className="flex h-64 items-center justify-center border border-border bg-card">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : receivedRequests.length === 0 ? (
               <EmptyState
                 title="No received requests"
                 description="When buyers request your products, they will appear here."
                 icon={<ShoppingBag className="h-8 w-8" />}
               />
             ) : (
-              <div className="overflow-hidden rounded-xl border border-border bg-card">
+              <div className="overflow-hidden rounded-none border-2 border-border bg-card">
                 <div className="divide-y divide-border">
-                  {receivedRequests.map((r) => (
+                  {receivedRequests.map((r: any) => (
                     <RequestRow key={r.id} r={r} showActions={true} />
                   ))}
                 </div>
@@ -160,7 +167,11 @@ function DashboardRequestsPage() {
           </TabsContent>
 
           <TabsContent value="sent" className="mt-4">
-            {sentRequests.length === 0 ? (
+            {isLoadingSent ? (
+              <div className="flex h-64 items-center justify-center border border-border bg-card">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : sentRequests.length === 0 ? (
               <EmptyState
                 title="No sent requests"
                 description="You haven't requested any products yet. Browse the marketplace to find something you like."
@@ -172,9 +183,9 @@ function DashboardRequestsPage() {
                 }
               />
             ) : (
-              <div className="overflow-hidden rounded-xl border border-border bg-card">
+              <div className="overflow-hidden rounded-none border-2 border-border bg-card">
                 <div className="divide-y divide-border">
-                  {sentRequests.map((r) => (
+                  {sentRequests.map((r: PurchaseRequest) => (
                     <RequestRow key={r.id} r={r} showActions={false} />
                   ))}
                 </div>

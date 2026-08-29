@@ -17,6 +17,9 @@ class PurchaseRequestResource extends JsonResource
             'status' => $this->status,
             'message' => $this->message,
             'created_at' => $this->created_at->toIso8601String(),
+            'product' => new ProductResource($this->whenLoaded('product')),
+            'buyer' => new UserResource($this->whenLoaded('buyer')),
+            'seller' => new UserResource($this->whenLoaded('seller')),
         ];
     }
 }

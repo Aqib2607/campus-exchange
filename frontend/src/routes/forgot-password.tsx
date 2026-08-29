@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { UNIVERSITY_DOMAIN } from "@/lib/mock-data";
+import { UNIVERSITY_DOMAIN } from "@/lib/constants";
 import { Loader2, CheckCircle } from "lucide-react";
+import { api } from "@/services/api";
 
 export const Route = createFileRoute("/forgot-password")({
   component: ForgotPasswordPage,
@@ -34,8 +35,12 @@ function ForgotPasswordPage() {
     e.preventDefault();
     if (!validate()) return;
     setStatus("loading");
-    await new Promise((r) => setTimeout(r, 800));
-    setStatus("success");
+    try {
+      await api.auth.forgotPassword({ email });
+      setStatus("success");
+    } catch {
+      setStatus("error");
+    }
   };
 
   if (status === "success") {

@@ -6,6 +6,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle, Mail, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
+import { api } from "@/services/api";
+
 export const Route = createFileRoute("/verify-email")({
   component: VerifyEmailPage,
 });
@@ -16,8 +18,12 @@ function VerifyEmailPage() {
 
   const handleResend = async () => {
     setResendState("loading");
-    await new Promise((r) => setTimeout(r, 700));
-    setResendState("sent");
+    try {
+      await api.auth.resendVerification();
+      setResendState("sent");
+    } catch (error) {
+      setResendState("error");
+    }
   };
 
   // If user's email is already verified in mock data

@@ -2,26 +2,10 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect } from "react";
-import { mockStatistics, mockProducts, mockReports } from "@/lib/mock-data";
-import {
-  LayoutDashboard,
-  Users,
-  Package,
-  Tag,
-  Flag,
-  BarChart2,
-  ShoppingBag,
-  ArrowRight,
-} from "lucide-react";
-
-export const adminLinks = [
-  { to: "/admin", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
-  { to: "/admin/users", label: "Users", icon: <Users className="h-4 w-4" /> },
-  { to: "/admin/products", label: "Products", icon: <Package className="h-4 w-4" /> },
-  { to: "/admin/categories", label: "Categories", icon: <Tag className="h-4 w-4" /> },
-  { to: "/admin/reports", label: "Reports", icon: <Flag className="h-4 w-4" /> },
-  { to: "/admin/analytics", label: "Analytics", icon: <BarChart2 className="h-4 w-4" /> },
-];
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/services/api";
+import { ShoppingBag, ArrowRight, Loader2 } from "lucide-react";
+import { adminLinks } from "@/config/nav";
 
 export const Route = createFileRoute("/admin/")({
   component: AdminDashboardPage,
@@ -36,21 +20,39 @@ function AdminDashboardPage() {
     else if (user.role !== "admin") navigate({ to: "/dashboard" });
   }, [user, navigate]);
 
+  const { data: statsData, isLoading: isStatsLoading } = useQuery({
+    queryKey: ['admin', 'stats'],
+    queryFn: api.admin.statistics,
+    enabled: !!user?.id && user?.role === "admin",
+  });
+
+  const { data: products = [], isLoading: isProductsLoading } = useQuery({
+    queryKey: ['admin', 'products'],
+    queryFn: api.admin.products,
+    enabled: !!user?.id && user?.role === "admin",
+  });
+
+  const { data: reports = [], isLoading: isReportsLoading } = useQuery({
+    queryKey: ['admin', 'reports'],
+    queryFn: api.reports.list,
+    enabled: !!user?.id && user?.role === "admin",
+  });
+
   if (!user || user.role !== "admin") return null;
 
-  const s = mockStatistics;
-
   const stats = [
-    { label: "Total Users", value: s.total_users, href: "/admin/users" },
-    { label: "Total Products", value: s.total_products, href: "/admin/products" },
-    { label: "Available", value: s.available_products, href: "/admin/products" },
-    { label: "Sold", value: s.sold_products, href: "/admin/products" },
-    { label: "Total Requests", value: s.total_requests, href: "/admin/products" },
-    { label: "Pending Reports", value: mockReports.filter((r) => r.status === "pending").length, href: "/admin/reports" },
+    { label: "Total Users", value: statsData?.total_users || 0, href: "/admin/users" },
+    { label: "Total Products", value: statsData?.total_products || 0, href: "/admin/products" },
+    { label: "Available", value: statsData?.available_products || 0, href: "/admin/products" },
+    { label: "Sold", value: statsData?.sold_products || 0, href: "/admin/products" },
+    { label: "Total Requests", value: statsData?.total_requests || 0, href: "/admin/products" },
+    { label: "Pending Reports", value: reports.filter((r: any) => r.status === "pending").length, href: "/admin/reports" },
   ];
 
-  const recentProducts = mockProducts.slice(0, 5);
-  const pendingReports = mockReports.filter((r) => r.status === "pending");
+  const recentProducts = products.slice(0, 5);
+  const pendingReports = reports.filter((r: any) => r.status === "pending").slice(0, 5);
+
+  const isLoading = isStatsLoading || isProductsLoading || isReportsLoading;
 
   return (
     <DashboardShell links={adminLinks} heading="Admin Control">
@@ -71,7 +73,9 @@ function AdminDashboardPage() {
               className="group flex flex-col justify-between bg-card p-6 sm:p-8 transition-colors hover:bg-muted/30"
             >
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{s.label}</p>
-              <p className="mt-4 font-display text-5xl font-bold text-foreground transition-transform duration-300 group-hover:scale-110 sm:text-6xl group-hover:text-primary origin-left">{s.value}</p>
+              <p className="mt-4 font-display text-5xl font-bold text-foreground transition-transform duration-300 group-hover:scale-110 sm:text-6xl group-hover:text-primary origin-left">
+                {isStatsLoading || isReportsLoading ? <Loader2 className="h-10 w-10 animate-spin mt-4" /> : s.value}
+              </p>
             </Link>
           ))}
         </div>
@@ -86,7 +90,9 @@ function AdminDashboardPage() {
               </Link>
             </div>
             <div className="flex flex-col gap-4">
-              {recentProducts.map((p) => (
+              {isProductsLoading ? (
+                <div className="flex justify-center p-4"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+              ) : recentProducts.map((p: any) => (
                 <div key={p.id} className="group flex items-center justify-between border border-border bg-card p-4 transition-colors hover:border-foreground">
                   <div className="flex flex-col">
                     <span className="font-display text-lg font-bold uppercase tracking-tight text-foreground line-clamp-1">{p.name}</span>
@@ -114,7 +120,9 @@ function AdminDashboardPage() {
                 </Link>
               </div>
               <div className="flex flex-col gap-4">
-                {pendingReports.map((r) => (
+                {isReportsLoading ? (
+                  <div className="flex justify-center p-4"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                ) : pendingReports.map((r: any) => (
                   <div key={r.id} className="group flex items-center justify-between border border-border bg-card p-4 transition-colors hover:border-foreground">
                     <div className="flex flex-col">
                       <p className="font-display text-lg font-bold uppercase tracking-tight text-foreground">

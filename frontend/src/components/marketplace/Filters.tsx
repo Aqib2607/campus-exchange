@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { mockCategories } from "@/lib/mock-data";
+import type { Category } from "@/types";
 
 export interface FilterValues {
   category: string;
@@ -86,10 +86,12 @@ export function FilterPanel({
   values,
   onChange,
   onReset,
+  categories = [],
 }: {
   values: FilterValues;
   onChange: (v: FilterValues) => void;
   onReset: () => void;
+  categories?: Category[];
 }) {
   const set = (patch: Partial<FilterValues>) => onChange({ ...values, ...patch });
 
@@ -103,7 +105,7 @@ export function FilterPanel({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All categories</SelectItem>
-            {mockCategories.map((c) => (
+            {categories.map((c) => (
               <SelectItem key={c.id} value={String(c.id)}>
                 {c.name}
               </SelectItem>
@@ -188,6 +190,7 @@ export function MobileFilters(props: {
   values: FilterValues;
   onChange: (v: FilterValues) => void;
   onReset: () => void;
+  categories?: Category[];
 }) {
   return (
     <Sheet>

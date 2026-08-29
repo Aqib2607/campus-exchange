@@ -15,27 +15,12 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { mockProducts, formatDate, formatPrice, getCategoryName, getUser } from "@/lib/mock-data";
+import { formatDate, formatPrice } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import {
-  LayoutDashboard,
-  Users,
-  Package,
-  Tag,
-  Flag,
-  BarChart2,
-  Eye,
-  Trash2,
-} from "lucide-react";
-
-const adminLinks = [
-  { to: "/admin", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
-  { to: "/admin/users", label: "Users", icon: <Users className="h-4 w-4" /> },
-  { to: "/admin/products", label: "Products", icon: <Package className="h-4 w-4" /> },
-  { to: "/admin/categories", label: "Categories", icon: <Tag className="h-4 w-4" /> },
-  { to: "/admin/reports", label: "Reports", icon: <Flag className="h-4 w-4" /> },
-  { to: "/admin/analytics", label: "Analytics", icon: <BarChart2 className="h-4 w-4" /> },
-];
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/services/api";
+import { Package, Eye, Trash2, Loader2 } from "lucide-react";
+import { adminLinks } from "@/config/nav";
 
 export const Route = createFileRoute("/admin/products")({
   component: AdminProductsPage,
@@ -44,28 +29,41 @@ export const Route = createFileRoute("/admin/products")({
 function AdminProductsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [deletedIds, setDeletedIds] = useState<number[]>([]);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!user) navigate({ to: "/login" });
     else if (user.role !== "admin") navigate({ to: "/dashboard" });
   }, [user, navigate]);
 
-  if (!user || user.role !== "admin") return null;
+  const { data: products = [], isLoading } = useQuery({
+    queryKey: ['admin', 'products'],
+    queryFn: api.admin.products,
+    enabled: !!user?.id && user?.role === "admin",
+  });
 
-  const products = mockProducts.filter((p) => !deletedIds.includes(p.id));
+  const deleteMutation = useMutation({
+    mutationFn: api.admin.deleteProduct,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'products'] });
+    },
+  });
+
+  if (!user || user.role !== "admin") return null;
 
   return (
     <DashboardShell links={adminLinks} heading="Admin Panel">
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Products</h1>
+          <h1 className="font-display text-4xl font-bold uppercase tracking-widest text-foreground">Products</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Review and manage all marketplace listings.
           </p>
         </div>
 
-        {products.length === 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+        ) : products.length === 0 ? (
           <EmptyState
             title="No products"
             description="There are no products listed on the marketplace."
@@ -74,9 +72,9 @@ function AdminProductsPage() {
         ) : (
           <>
             {/* Desktop table */}
-            <div className="hidden overflow-hidden rounded-xl border border-border bg-card md:block">
+            <div className="hidden overflow-hidden rounded-none border-2 border-border bg-card md:block">
               <table className="w-full text-sm">
-                <thead className="border-b border-border bg-muted/40">
+                <thead className="border-b-2 border-border bg-muted/40 uppercase tracking-wider text-xs">
                   <tr>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Product</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Seller</th>
@@ -88,15 +86,15 @@ function AdminProductsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {products.map((p) => {
-                    const seller = getUser(p.user_id);
+                  {products.map((p: any) => {
+                    const seller = p.user;
                     return (
                       <tr key={p.id} className="hover:bg-muted/20">
                         <td className="px-4 py-3">
                           <p className="font-medium text-foreground line-clamp-1">{p.name}</p>
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">{seller?.name ?? "Unknown"}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{getCategoryName(p.category_id)}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{p.category_name ?? "—"}</td>
                         <td className="px-4 py-3 font-medium">{formatPrice(p.price)}</td>
                         <td className="px-4 py-3">
                           <StatusBadge tone={toneForProductStatus(p.status)}>{p.status}</StatusBadge>
@@ -125,7 +123,7 @@ function AdminProductsPage() {
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                                   <AlertDialogAction
-                                    onClick={() => setDeletedIds((prev) => [...prev, p.id])}
+                                    onClick={() => deleteMutation.mutate(p.id)}
                                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                   >
                                     Delete
@@ -144,14 +142,14 @@ function AdminProductsPage() {
 
             {/* Mobile cards */}
             <div className="space-y-3 md:hidden">
-              {products.map((p) => {
-                const seller = getUser(p.user_id);
+              {products.map((p: any) => {
+                const seller = p.user;
                 return (
-                  <div key={p.id} className="overflow-hidden rounded-xl border border-border bg-card p-4">
+                  <div key={p.id} className="overflow-hidden rounded-none border-2 border-border bg-card p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="font-medium text-foreground line-clamp-1">{p.name}</p>
-                        <p className="text-xs text-muted-foreground">{seller?.name ?? "Unknown"} · {getCategoryName(p.category_id)}</p>
+                        <p className="text-xs text-muted-foreground">{seller?.name ?? "Unknown"} · {p.category_name ?? "—"}</p>
                         <p className="text-xs font-semibold text-primary">{formatPrice(p.price)}</p>
                       </div>
                       <StatusBadge tone={toneForProductStatus(p.status)}>{p.status}</StatusBadge>
@@ -172,7 +170,7 @@ function AdminProductsPage() {
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
                             <AlertDialogAction
-                              onClick={() => setDeletedIds((prev) => [...prev, p.id])}
+                              onClick={() => deleteMutation.mutate(p.id)}
                               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                             >
                               Delete

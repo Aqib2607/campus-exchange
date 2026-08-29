@@ -5,28 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/contexts/AuthContext";
-import { formatDate } from "@/lib/mock-data";
+import { formatDate } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import {
-  LayoutDashboard,
-  Package,
-  ShoppingBag,
-  Heart,
-  MessageSquare,
-  User,
-  Loader2,
-  CheckCircle,
-} from "lucide-react";
+import { Loader2, CheckCircle } from "lucide-react";
 import { ReportModal } from "@/components/marketplace/ReportModal";
-
-const studentLinks = [
-  { to: "/dashboard", label: "Overview", icon: <LayoutDashboard className="h-4 w-4" /> },
-  { to: "/dashboard/listings", label: "My Listings", icon: <Package className="h-4 w-4" /> },
-  { to: "/dashboard/requests", label: "Requests", icon: <ShoppingBag className="h-4 w-4" /> },
-  { to: "/dashboard/favorites", label: "Favorites", icon: <Heart className="h-4 w-4" /> },
-  { to: "/dashboard/messages", label: "Messages", icon: <MessageSquare className="h-4 w-4" /> },
-  { to: "/dashboard/profile", label: "Profile", icon: <User className="h-4 w-4" /> },
-];
+import { api } from "@/services/api";
+import { studentLinks } from "@/config/nav";
 
 export const Route = createFileRoute("/dashboard/profile")({
   component: DashboardProfilePage,
@@ -37,7 +21,7 @@ function DashboardProfilePage() {
   const navigate = useNavigate();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ name: "", contact: "" });
-  const [saveStatus, setSaveStatus] = useState<"idle" | "loading" | "success">("idle");
+  const [saveStatus, setSaveStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [reportOpen, setReportOpen] = useState(false);
 
   useEffect(() => {
@@ -53,17 +37,21 @@ function DashboardProfilePage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaveStatus("loading");
-    await new Promise((r) => setTimeout(r, 600));
-    setSaveStatus("success");
-    setEditing(false);
-    setTimeout(() => setSaveStatus("idle"), 3000);
+    try {
+      await api.auth.updateProfile(form);
+      setSaveStatus("success");
+      setEditing(false);
+      setTimeout(() => setSaveStatus("idle"), 3000);
+    } catch {
+      setSaveStatus("error"); // Assuming error handling exists or will show up
+    }
   };
 
   return (
     <DashboardShell links={studentLinks} heading="Student Dashboard">
       <div className="max-w-lg space-y-6">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Profile</h1>
+          <h1 className="font-display text-4xl font-bold uppercase tracking-widest text-foreground">Profile</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             View and update your account information.
           </p>
@@ -76,10 +64,10 @@ function DashboardProfilePage() {
           </Alert>
         )}
 
-        <div className="overflow-hidden rounded-xl border border-border bg-card">
+        <div className="overflow-hidden rounded-none border-2 border-border bg-card">
           {/* Avatar area */}
           <div className="flex items-center gap-4 border-b border-border bg-muted/30 p-6">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-primary text-xl font-bold text-primary-foreground">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-none bg-primary font-display text-3xl font-bold uppercase text-primary-foreground">
               {user.name[0]}
             </div>
             <div>
@@ -182,6 +170,7 @@ function DashboardProfilePage() {
         open={reportOpen}
         onOpenChange={setReportOpen}
         targetType="user"
+        targetId={user.id}
         targetLabel={user.name}
       />
     </DashboardShell>

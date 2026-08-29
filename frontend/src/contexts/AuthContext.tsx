@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { UNIVERSITY_DOMAIN } from "@/lib/mock-data";
+import { useQueryClient } from "@tanstack/react-query";
+import { UNIVERSITY_DOMAIN } from "@/lib/constants";
 import type { User } from "@/types";
 import { api } from "@/services/api";
 
@@ -20,6 +21,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [favorites, setFavorites] = useState<number[]>([]);
@@ -32,48 +34,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const userData = await api.auth.me();
           setUser(userData);
           
-          const favs = await api.favorites.list();
-          setFavorites(favs.map((f: any) => f.product_id));
+          try {
+            const favs = await api.favorites.list();
+            setFavorites(favs.map((f: any) => f.product_id));
+          } catch {
+            setFavorites([]);
+          }
         }
       } catch {
         localStorage.removeItem('auth_token');
+        queryClient.clear();
         setUser(null);
+        setFavorites([]);
       } finally {
         setHydrated(true);
       }
     };
     initAuth();
-  }, []);
+  }, [queryClient]);
 
   const signIn = useCallback(async (email: string, password?: string) => {
+    queryClient.clear();
     const res = await api.auth.login({ email, password: password || 'password' });
     localStorage.setItem('auth_token', res.data.token);
     setUser(res.data.user);
     
-    const favs = await api.favorites.list();
-    setFavorites(favs.map((f: any) => f.product_id));
+    try {
+      const favs = await api.favorites.list();
+      setFavorites(favs.map((f: any) => f.product_id));
+    } catch {
+      setFavorites([]);
+    }
     
     return res.data.user;
-  }, []);
+  }, [queryClient]);
 
   const registerUser = useCallback(async (data: any) => {
+    queryClient.clear();
     const res = await api.auth.register(data);
     localStorage.setItem('auth_token', res.data.token);
     setUser(res.data.user);
     setFavorites([]);
     return res.data.user;
-  }, []);
+  }, [queryClient]);
 
   const signOut = useCallback(async () => {
     try {
       await api.auth.logout();
     } catch (e) {
       // ignore
+    } finally {
+      localStorage.removeItem('auth_token');
+      await queryClient.cancelQueries();
+      queryClient.clear();
+      setUser(null);
+      setFavorites([]);
     }
-    setUser(null);
-    setFavorites([]);
-    localStorage.removeItem('auth_token');
-  }, []);
+  }, [queryClient]);
 
   const toggleFavorite = useCallback(async (productId: number) => {
     const isFav = favorites.includes(productId);
@@ -85,12 +102,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setFavorites((prev) => [...prev, productId]);
         await api.favorites.add(productId);
       }
+      queryClient.invalidateQueries({ queryKey: ['favorites'] });
     } catch (e) {
       // Revert optimistic update
       if (isFav) setFavorites((prev) => [...prev, productId]);
       else setFavorites((prev) => prev.filter((id) => id !== productId));
     }
-  }, [favorites]);
+  }, [favorites, queryClient]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

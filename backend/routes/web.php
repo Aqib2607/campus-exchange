@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Route;
 
 
 Route::get('/{any}', function () {
-    $path = public_path('frontend/index.html');
+    $path = public_path('spa.html');
     if (!file_exists($path)) {
         return "Frontend build not found. Please run 'npm run build' in the frontend directory.";
     }

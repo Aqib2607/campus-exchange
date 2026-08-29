@@ -11,7 +11,7 @@ class FavoriteController extends Controller
 {
     public function index(Request $request)
     {
-        $favorites = Favorite::with('product')->where('user_id', $request->user()->id)->get();
+        $favorites = Favorite::with('product.category')->where('user_id', $request->user()->id)->get();
         return response()->json([
             'success' => true,
             'data' => FavoriteResource::collection($favorites)

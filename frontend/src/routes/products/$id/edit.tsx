@@ -58,7 +58,7 @@ function EditProductPage() {
           title="Edit listing"
           description="Update the details of your listing below."
         />
-        <div className="rounded-xl border border-border bg-card p-6 sm:p-8">
+        <div className="rounded-none border-2 border-border bg-card p-6 sm:p-8">
           <ProductForm mode="edit" product={product} />
         </div>
       </div>

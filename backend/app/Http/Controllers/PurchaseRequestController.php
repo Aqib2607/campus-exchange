@@ -12,19 +12,29 @@ class PurchaseRequestController extends Controller
 {
     public function sent(Request $request)
     {
-        $requests = PurchaseRequest::where('buyer_id', $request->user()->id)->get();
+        $paginator = PurchaseRequest::with(['product.category', 'buyer', 'seller'])->where('buyer_id', $request->user()->id)->paginate(50);
         return response()->json([
             'success' => true,
-            'data' => PurchaseRequestResource::collection($requests)
+            'data' => PurchaseRequestResource::collection($paginator->items()),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'total' => $paginator->total()
+            ]
         ]);
     }
 
     public function received(Request $request)
     {
-        $requests = PurchaseRequest::where('seller_id', $request->user()->id)->get();
+        $paginator = PurchaseRequest::with(['product.category', 'buyer', 'seller'])->where('seller_id', $request->user()->id)->paginate(50);
         return response()->json([
             'success' => true,
-            'data' => PurchaseRequestResource::collection($requests)
+            'data' => PurchaseRequestResource::collection($paginator->items()),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'total' => $paginator->total()
+            ]
         ]);
     }
 

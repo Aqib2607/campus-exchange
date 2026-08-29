@@ -11,48 +11,67 @@ use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\VerificationController;
+use Illuminate\Foundation\Auth\EmailVerificationRequest;
 
-Route::post('/auth/register', [AuthController::class, 'register']);
-Route::post('/auth/login', [AuthController::class, 'login']);
+Route::middleware('throttle:300,1')->group(function () {
+    Route::post('/auth/register', [AuthController::class, 'register']);
+    Route::post('/auth/login', [AuthController::class, 'login']);
+    Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
+    Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
+});
 
-// Public
-Route::get('/categories', [CategoryController::class, 'index']);
-Route::get('/products', [ProductController::class, 'index']);
-Route::get('/products/{product}', [ProductController::class, 'show']);
+// Public (Global API Limit)
+Route::middleware('throttle:60,1')->group(function () {
+    Route::get('/categories', [CategoryController::class, 'index']);
+    Route::get('/products', [ProductController::class, 'index']);
+    Route::get('/products/{product}', [ProductController::class, 'show'])->whereNumber('product');
+});
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/user', [AuthController::class, 'me']);
+    Route::put('/auth/user', [AuthController::class, 'updateProfile']);
+    Route::patch('/auth/user', [AuthController::class, 'updateProfile']);
     Route::get('/users/me', [AuthController::class, 'me']);
 
-    // Products (Student)
-    Route::post('/products', [ProductController::class, 'store']);
-    Route::put('/products/{product}', [ProductController::class, 'update']);
-    Route::patch('/products/{product}', [ProductController::class, 'update']);
-    Route::delete('/products/{product}', [ProductController::class, 'destroy']);
+    // Password Reset (Authenticated but typically these are public; but let's expose them publicly)
 
-    // Favorites
-    Route::get('/favorites', [FavoriteController::class, 'index']);
-    Route::post('/products/{product}/favorite', [FavoriteController::class, 'store']);
-    Route::delete('/products/{product}/favorite', [FavoriteController::class, 'destroy']);
+    // Email Verification
+    Route::post('/email/verification-notification', [VerificationController::class, 'send'])->middleware(['throttle:6,1']);
+    Route::get('/email/verify/{id}/{hash}', [VerificationController::class, 'verify'])->middleware(['signed'])->name('verification.verify');
 
-    // Requests
-    Route::get('/requests/sent', [PurchaseRequestController::class, 'sent']);
-    Route::get('/requests/received', [PurchaseRequestController::class, 'received']);
-    Route::post('/products/{product}/requests', [PurchaseRequestController::class, 'store']);
-    Route::patch('/requests/{purchaseRequest}/accept', [PurchaseRequestController::class, 'accept']);
-    Route::patch('/requests/{purchaseRequest}/reject', [PurchaseRequestController::class, 'reject']);
+    Route::middleware('verified')->group(function () {
+        // Products (Student)
+        Route::get('/products/mine', [ProductController::class, 'mine']);
+        Route::post('/products', [ProductController::class, 'store']);
+        Route::put('/products/{product}', [ProductController::class, 'update']);
+        Route::patch('/products/{product}', [ProductController::class, 'update']);
+        Route::delete('/products/{product}', [ProductController::class, 'destroy']);
 
-    // Conversations & Messages
-    Route::get('/conversations', [ConversationController::class, 'index']);
-    Route::post('/conversations', [ConversationController::class, 'store']);
-    Route::get('/conversations/{conversation}', [ConversationController::class, 'show']);
-    Route::get('/conversations/{conversation}/messages', [MessageController::class, 'index']);
-    Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store']);
+        // Favorites
+        Route::get('/favorites', [FavoriteController::class, 'index']);
+        Route::post('/products/{product}/favorite', [FavoriteController::class, 'store']);
+        Route::delete('/products/{product}/favorite', [FavoriteController::class, 'destroy']);
 
-    // Reports
-    Route::post('/reports', [ReportController::class, 'store']);
-    Route::get('/reports/mine', [ReportController::class, 'mine']);
+        // Requests
+        Route::get('/requests/sent', [PurchaseRequestController::class, 'sent']);
+        Route::get('/requests/received', [PurchaseRequestController::class, 'received']);
+        Route::post('/products/{product}/requests', [PurchaseRequestController::class, 'store']);
+        Route::patch('/requests/{purchaseRequest}/accept', [PurchaseRequestController::class, 'accept']);
+        Route::patch('/requests/{purchaseRequest}/reject', [PurchaseRequestController::class, 'reject']);
+
+        // Conversations & Messages
+        Route::get('/conversations', [ConversationController::class, 'index']);
+        Route::post('/conversations', [ConversationController::class, 'store']);
+        Route::get('/conversations/{conversation}', [ConversationController::class, 'show']);
+        Route::get('/conversations/{conversation}/messages', [MessageController::class, 'index']);
+        Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store']);
+
+        // Reports
+        Route::post('/reports', [ReportController::class, 'store']);
+        Route::get('/reports/mine', [ReportController::class, 'mine']);
+    });
 
     // Admin Routes
     Route::middleware('admin')->prefix('admin')->group(function () {

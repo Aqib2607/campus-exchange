@@ -25,8 +25,8 @@ export function AuthLayout({
     <div className="flex min-h-screen flex-col bg-background">
       <Navbar />
       <main className="container-page flex flex-1 items-start justify-center py-10 sm:py-16">
-        <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
-          <h1 className="text-2xl font-bold text-foreground">{title}</h1>
+        <div className="w-full max-w-md rounded-none border-2 border-border bg-card p-6 sm:p-8">
+          <h1 className="font-display text-4xl font-bold uppercase tracking-widest text-foreground">{title}</h1>
           {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
           <div className="mt-6">{children}</div>
         </div>

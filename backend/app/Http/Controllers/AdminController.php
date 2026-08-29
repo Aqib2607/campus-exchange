@@ -32,15 +32,21 @@ class AdminController extends Controller
 
     public function users()
     {
+        $paginator = User::paginate(50);
         return response()->json([
             'success' => true,
-            'data' => UserResource::collection(User::all())
+            'data' => UserResource::collection($paginator->items()),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'total' => $paginator->total()
+            ]
         ]);
     }
 
     public function blockUser(Request $request, User $user)
     {
-        $user->update(['status' => 'blocked']);
+        $user->forceFill(['status' => 'blocked'])->save();
         return response()->json([
             'success' => true,
             'message' => 'User blocked successfully'
@@ -58,9 +64,15 @@ class AdminController extends Controller
 
     public function products()
     {
+        $paginator = Product::with(['user', 'category'])->paginate(50);
         return response()->json([
             'success' => true,
-            'data' => ProductResource::collection(Product::all())
+            'data' => ProductResource::collection($paginator->items()),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'total' => $paginator->total()
+            ]
         ]);
     }
 
@@ -75,9 +87,15 @@ class AdminController extends Controller
 
     public function reports()
     {
+        $paginator = Report::with(['reporter', 'reportedUser', 'product.category'])->paginate(50);
         return response()->json([
             'success' => true,
-            'data' => ReportResource::collection(Report::all())
+            'data' => ReportResource::collection($paginator->items()),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'total' => $paginator->total()
+            ]
         ]);
     }
 

@@ -6,12 +6,13 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use App\Http\Resources\ProductResource;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Product::query();
+        $query = Product::with(['user', 'category']);
 
         if ($request->filled('category_id')) {
             $query->where('category_id', $request->category_id);
@@ -29,14 +30,34 @@ class ProductController extends Controller
             $query->where('name', 'like', '%' . $request->search . '%');
         }
 
+        $paginator = $query->paginate(24);
         return response()->json([
             'success' => true,
-            'data' => ProductResource::collection($query->get())
+            'data' => ProductResource::collection($paginator->items()),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'total' => $paginator->total()
+            ]
+        ]);
+    }
+
+    public function mine(Request $request)
+    {
+        $products = Product::with(['user', 'category'])
+            ->where('user_id', $request->user()->id)
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => ProductResource::collection($products)
         ]);
     }
 
     public function show(Product $product)
     {
+        $product->load(['user', 'category']);
         return response()->json([
             'success' => true,
             'data' => new ProductResource($product)
@@ -57,7 +78,9 @@ class ProductController extends Controller
         ]);
 
         if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('products', 'public');
+            $file = $request->file('image');
+            $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
+            $path = $file->storeAs('products', $filename, 'public');
             $validated['image'] = '/storage/' . $path;
         } else {
             $validated['image'] = 'placeholder.png';
@@ -94,7 +117,9 @@ class ProductController extends Controller
         ]);
 
         if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('products', 'public');
+            $file = $request->file('image');
+            $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
+            $path = $file->storeAs('products', $filename, 'public');
             $validated['image'] = '/storage/' . $path;
         }
 

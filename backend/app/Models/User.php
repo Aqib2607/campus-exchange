@@ -9,7 +9,9 @@ use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class User extends Authenticatable
+use Illuminate\Contracts\Auth\MustVerifyEmail;
+
+class User extends Authenticatable implements MustVerifyEmail
 {
     use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
@@ -25,7 +27,8 @@ class User extends Authenticatable
         'role',
         'status',
         'contact_information',
-        'profile_image'
+        'profile_image',
+        'email_verified_at',
     ];
 
     /**

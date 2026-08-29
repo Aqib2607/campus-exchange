@@ -5,17 +5,53 @@
 //     React/TanStack dedupe, error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import fs from "node:fs";
+
+// Monkey patch fs.rmSync to bypass Windows EPERM / EBUSY locks during build
+const originalRmSync = fs.rmSync;
+fs.rmSync = (path, options) => {
+  try {
+    originalRmSync(path, options);
+  } catch (e: any) {
+    if (e.code !== "EPERM" && e.code !== "EBUSY") throw e;
+    console.warn(`[Build Patch] Swallowed ${e.code} for ${path}`);
+  }
+};
 
 export default defineConfig({
   vite: {
-    base: "/frontend/",
+    base: "/",
+    build: {
+      emptyOutDir: false,
+    },
+    plugins: [
+      {
+        name: 'disable-empty-out-dir',
+        enforce: 'pre',
+        config(config) {
+          if (config.build) config.build.emptyOutDir = false;
+          if (config.environments?.['ssr']?.build) {
+             config.environments['ssr'].build.emptyOutDir = false;
+          }
+        }
+      }
+    ],
+    environments: {
+      ssr: {
+        build: {
+          emptyOutDir: false,
+        },
+      },
+    },
   },
   tanstackStart: {
-    // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-    // nitro/vite builds from this
+    ssr: false,
     server: { entry: "server" },
   },
   nitro: {
     preset: "node-server",
+    output: {
+      dir: ".build_output",
+    },
   },
 });

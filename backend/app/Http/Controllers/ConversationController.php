@@ -12,8 +12,11 @@ class ConversationController extends Controller
     public function index(Request $request)
     {
         $userId = $request->user()->id;
-        $conversations = Conversation::where('user_one_id', $userId)
-            ->orWhere('user_two_id', $userId)
+        $conversations = Conversation::with(['product.category', 'userOne', 'userTwo'])
+            ->where(function ($query) use ($userId) {
+                $query->where('user_one_id', $userId)
+                      ->orWhere('user_two_id', $userId);
+            })
             ->orderBy('updated_at', 'desc')
             ->get();
 

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/contexts/AuthContext";
-import { UNIVERSITY_DOMAIN } from "@/lib/mock-data";
+import { UNIVERSITY_DOMAIN } from "@/lib/constants";
 import { Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/register")({

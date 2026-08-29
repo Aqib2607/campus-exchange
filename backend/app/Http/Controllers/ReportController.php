@@ -10,10 +10,15 @@ class ReportController extends Controller
 {
     public function mine(Request $request)
     {
-        $reports = Report::where('reporter_id', $request->user()->id)->get();
+        $paginator = Report::with(['product.category', 'reportedUser'])->where('reporter_id', $request->user()->id)->paginate(50);
         return response()->json([
             'success' => true,
-            'data' => ReportResource::collection($reports)
+            'data' => ReportResource::collection($paginator->items()),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'total' => $paginator->total()
+            ]
         ]);
     }
 

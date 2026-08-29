@@ -28,7 +28,7 @@ function CreateProductPage() {
           title="Create listing"
           description="Fill in the details below to list your product on the Campus Exchange marketplace."
         />
-        <div className="rounded-xl border border-border bg-card p-6 sm:p-8">
+        <div className="rounded-none border-2 border-border bg-card p-6 sm:p-8">
           <ProductForm mode="create" />
         </div>
       </div>

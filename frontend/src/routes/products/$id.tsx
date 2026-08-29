@@ -10,11 +10,9 @@ import { api } from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   formatPrice,
-  getCategoryName,
   formatDate,
-  getUser,
-  mockRequests,
-} from "@/lib/mock-data";
+} from "@/lib/utils";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Product } from "@/types";
 import { Heart, MapPin, Phone, Flag, Edit, MessageSquare, Loader2, ArrowLeft, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -28,31 +26,31 @@ function ProductDetailPage() {
   const { user, isFavorite, toggleFavorite } = useAuth();
   const navigate = useNavigate();
 
-  const [product, setProduct] = useState<Product | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const { data: product, isLoading: loading, isError: error } = useQuery({
+    queryKey: ['product', id],
+    queryFn: () => api.products.get(Number(id)),
+  });
+
+  const { data: sentRequests = [] } = useQuery({
+    queryKey: ['requests', 'sent', user?.id],
+    queryFn: api.requests.sent,
+    enabled: !!user?.id,
+  });
+
+  const requestMutation = useMutation({
+    mutationFn: () => api.requests.create(product!.id),
+    onSuccess: () => {
+      setRequestStatus("sent");
+      queryClient.invalidateQueries({ queryKey: ['requests', 'sent', user?.id] });
+    },
+    onError: () => {
+      setRequestStatus("error");
+    }
+  });
+
+  const queryClient = useQueryClient();
   const [requestStatus, setRequestStatus] = useState<"idle" | "loading" | "sent" | "error">("idle");
   const [reportOpen, setReportOpen] = useState(false);
-
-  const load = () => {
-    setLoading(true);
-    setError(false);
-    api.products
-      .get(Number(id))
-      .then((p) => {
-        if (p) {
-          setProduct(p);
-        } else {
-          setError(true);
-        }
-      })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    load();
-  }, [id]);
 
   if (loading) return <AppLayout><LoadingState label="Loading product details…" /></AppLayout>;
   if (error || !product)
@@ -61,29 +59,28 @@ function ProductDetailPage() {
         <ErrorState
           title="Product not found"
           description="This listing may have been removed or does not exist."
-          onRetry={load}
+          onRetry={() => queryClient.invalidateQueries({ queryKey: ['product', id] })}
         />
       </AppLayout>
     );
 
-  const seller = getUser(product.user_id);
+  const seller = (product as any).user;
   const saved = isFavorite(product.id);
   const isOwner = user?.id === product.user_id;
   const isSold = product.status === "sold";
 
   // Check if the current user already sent a request for this product
   const existingRequest = user
-    ? mockRequests.find((r) => r.product_id === product.id && r.buyer_id === user.id)
+    ? sentRequests.find((r: any) => r.product_id === product.id)
     : null;
 
-  const handleRequest = async () => {
+  const handleRequest = () => {
     if (!user) {
       navigate({ to: "/login" });
       return;
     }
     setRequestStatus("loading");
-    await new Promise((r) => setTimeout(r, 700));
-    setRequestStatus("sent");
+    requestMutation.mutate();
   };
 
   const handleMessage = () => {
@@ -136,7 +133,7 @@ function ProductDetailPage() {
               <div className="mb-8">
                 <div className="mb-4 flex items-center justify-between">
                   <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                    {getCategoryName(product.category_id)}
+                    {product.category_name ?? "—"}
                   </span>
                   <StatusBadge tone={toneForProductStatus(product.status)} className="rounded-none border-0 text-[10px] font-bold uppercase tracking-widest">
                     {product.status}
@@ -295,6 +292,7 @@ function ProductDetailPage() {
         open={reportOpen}
         onOpenChange={setReportOpen}
         targetType="product"
+        targetId={product.id}
         targetLabel={product.name}
       />
     </AppLayout>

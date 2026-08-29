@@ -4,32 +4,19 @@ import { EmptyState } from "@/components/common/states";
 import { ProductGrid } from "@/components/marketplace/ProductCard";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { mockProducts } from "@/lib/mock-data";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/services/api";
 import { useEffect } from "react";
-import {
-  LayoutDashboard,
-  Package,
-  ShoppingBag,
-  Heart,
-  MessageSquare,
-  User,
-} from "lucide-react";
-
-const studentLinks = [
-  { to: "/dashboard", label: "Overview", icon: <LayoutDashboard className="h-4 w-4" /> },
-  { to: "/dashboard/listings", label: "My Listings", icon: <Package className="h-4 w-4" /> },
-  { to: "/dashboard/requests", label: "Requests", icon: <ShoppingBag className="h-4 w-4" /> },
-  { to: "/dashboard/favorites", label: "Favorites", icon: <Heart className="h-4 w-4" /> },
-  { to: "/dashboard/messages", label: "Messages", icon: <MessageSquare className="h-4 w-4" /> },
-  { to: "/dashboard/profile", label: "Profile", icon: <User className="h-4 w-4" /> },
-];
+import { Loader2, Heart } from "lucide-react";
+import type { Product } from "@/types";
+import { studentLinks } from "@/config/nav";
 
 export const Route = createFileRoute("/dashboard/favorites")({
   component: DashboardFavoritesPage,
 });
 
 function DashboardFavoritesPage() {
-  const { user, favorites } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -37,21 +24,31 @@ function DashboardFavoritesPage() {
     else if (user.role === "admin") navigate({ to: "/admin" });
   }, [user, navigate]);
 
+  const { data: favoritesData, isLoading } = useQuery({
+    queryKey: ['favorites', user?.id],
+    queryFn: api.favorites.list,
+    enabled: !!user?.id && user?.role !== "admin",
+  });
+
   if (!user || user.role === "admin") return null;
 
-  const savedProducts = mockProducts.filter((p) => favorites.includes(p.id));
+  const savedProducts: Product[] = favoritesData?.map((f: any) => f.product).filter(Boolean) || [];
 
   return (
     <DashboardShell links={studentLinks} heading="Student Dashboard">
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Saved Products</h1>
+          <h1 className="font-display text-4xl font-bold uppercase tracking-widest text-foreground">Saved Products</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Products you have saved from the marketplace.
           </p>
         </div>
 
-        {savedProducts.length === 0 ? (
+        {isLoading ? (
+          <div className="flex h-64 items-center justify-center border border-border bg-card">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : savedProducts.length === 0 ? (
           <EmptyState
             title="No saved products"
             description="Browse the marketplace and save products you are interested in."
