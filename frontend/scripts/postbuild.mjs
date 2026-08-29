@@ -72,6 +72,7 @@ function buildSpaShell() {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Campus Exchange \u2014 University Student Marketplace</title>
     <meta name="description" content="Buy and sell within your university community. Campus Exchange is a student marketplace for verified university students." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon.ico" type="image/x-icon" />
     ${cssTag}
   </head>
@@ -132,9 +133,16 @@ async function syncToLaravel() {
   }
 
   // ── favicon ───────────────────────────────────────────────────────────────
-  const faviconSrc = path.join(publicOutputPath, 'favicon.ico');
-  if (fs.existsSync(faviconSrc)) {
-    fs.copyFileSync(faviconSrc, path.join(backendPublicDir, 'favicon.ico'));
+  const favicons = ['favicon.ico', 'favicon.svg'];
+  for (const fav of favicons) {
+    const src = path.join(frontendDir, 'public', fav);
+    if (fs.existsSync(src)) {
+      fs.copyFileSync(src, path.join(backendPublicDir, fav));
+      const frontendSub = path.join(backendPublicDir, 'frontend');
+      if (fs.existsSync(frontendSub)) {
+        fs.copyFileSync(src, path.join(frontendSub, fav));
+      }
+    }
   }
 
   console.log('Synchronization complete.');

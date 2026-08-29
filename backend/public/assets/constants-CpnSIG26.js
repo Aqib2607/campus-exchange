@@ -1,0 +1,1 @@
+var e=`university.edu`;export{e as t};
