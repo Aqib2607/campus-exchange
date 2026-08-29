@@ -70,7 +70,7 @@ function buildSpaShell() {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Campus Exchange \u2014 University Student Marketplace</title>
+    <title>Campus Exchange</title>
     <meta name="description" content="Buy and sell within your university community. Campus Exchange is a student marketplace for verified university students." />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon.ico" type="image/x-icon" />

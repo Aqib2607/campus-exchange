@@ -78,13 +78,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Campus Exchange — University Student Marketplace" },
+      { title: "Campus Exchange" },
       { name: "description", content: "Buy and sell within your university community. Campus Exchange is a student marketplace for verified university students." },
       { name: "author", content: "Campus Exchange" },
-      { property: "og:title", content: "Campus Exchange — University Student Marketplace" },
+      { property: "og:title", content: "Campus Exchange" },
       { property: "og:description", content: "Buy and sell within your university community." },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
       {
